@@ -1,0 +1,13 @@
+{{- if .Values.kong.enabled }}
+{{- range .Values.kong.consumers }}
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "telus.labels" $ | nindent 4 }}
+  annotations:
+    {{- include "telus.annotations" $ | nindent 4}} 
+username: {{ .username }}
+{{- end }}
+{{- end }}

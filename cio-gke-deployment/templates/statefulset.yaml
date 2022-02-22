@@ -1,0 +1,94 @@
+{{- if (eq .Values.type "statefulset")}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.applicationName }}-{{ .Values.environment }}
+  labels:
+    app: {{ .Values.applicationName }}-{{ .Values.environment }}
+    {{- include "telus.labels" . | nindent 4 }}
+  annotations:
+    {{- include "telus.annotations" . | nindent 4}}    
+  namespace: {{ .Values.namespace }}
+spec:
+  podManagementPolicy: OrderedReady
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: {{ .Values.applicationName }}-{{ .Values.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.applicationName }}-{{ .Values.environment }}
+    spec:
+      containers:
+      - name: {{ .Values.applicationName }}-{{ .Values.environment }}
+        image: {{ .Values.image.repository }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env: 
+        {{- range .Values.extraEnvs }}
+        - name: {{ .name }}
+          value: {{ .value }}
+        {{- end }}
+        volumeMounts: 
+        {{- range .Values.volumeMounts }}
+        - name: {{ .name }}
+          mountPath: {{ .path }}
+        {{- end }}
+        {{- range .Values.secretMounts }}
+        - name: {{ .name }}
+          mountPath: {{ .path }}
+        {{- end }}
+        ports:
+        - name: http-server
+          containerPort: {{ .Values.containerPort | default (8080) }}
+        livenessProbe:
+{{ toYaml .Values.livenessProbe | indent 10}}
+        readinessProbe:
+{{ toYaml .Values.readinessProbe | indent 10}}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+      {{- if .Values.initContainers }}
+      initContainers:
+{{ tpl .Values.initContainers . | indent 6 }}
+      {{- end }}      
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+      volumes:
+      {{- if .Values.configmaps }}
+      - name: configmap
+        configMap:
+          name: {{ .Values.applicationName }}-{{ .Values.environment }}-configmap
+      {{- end }}
+      {{- if .Values.volumes }}
+      {{ tpl .Values.volumes . | nindent 6 }}
+      {{- end }}
+      {{- range .Values.secretMounts }}
+      - name: {{ .name }}
+        secret:
+          secretName: {{ .secretName }}
+      {{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      labels:
+        app: {{ .Values.applicationName }}-{{ .Values.environment }}
+      name: {{ .Values.applicationName }}-{{ .Values.environment }}
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      dataSource: null
+      resources:
+        requests:
+          storage: 10Gi
+{{- end }}
+         

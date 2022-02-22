@@ -1,0 +1,18 @@
+{{- if .Values.kong.enabled }}
+{{- range .Values.kong.plugins }}
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ .name }} 
+  namespace: {{ $.Values.namespace }} 
+  labels:
+    {{- include "telus.labels" $ | nindent 4 }}
+  annotations:
+    {{- include "telus.annotations" $ | nindent 4}} 
+plugin: {{ .plugin }}
+config: 
+{{- with .config }}
+{{ toYaml . | indent 2 }}
+{{- end }}
+{{- end }}
+{{- end }}

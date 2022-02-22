@@ -1,0 +1,32 @@
+{{- if and (.Values.autoscaling.enabled) (eq .Values.type "deployment") }}
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Values.applicationName }}-{{ .Values.environment }}
+  labels:
+    app: {{ .Values.applicationName }}-{{ .Values.environment }}
+    {{- include "telus.labels" . | nindent 4 }}
+  annotations:
+    {{- include "telus.annotations" . | nindent 4}}    
+  namespace: {{ .Values.namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.applicationName }}-{{ .Values.environment }}
+  minReplicas: {{ .Values.autoscaling.minReplicas | default 2 }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas | default 5 }}
+  metrics:
+{{- with .Values.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: {{ . }}
+{{- end }}
+{{- with .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageUtilization: {{ . }}
+{{- end }}
+{{- end }}

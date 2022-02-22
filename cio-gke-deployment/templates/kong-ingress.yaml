@@ -1,0 +1,24 @@
+{{- if and (.Values.kong.enabled) ( or (.Values.kong.ingress.upstream) (.Values.kong.ingress.proxy) (.Values.kong.ingress.route)) }}
+apiVersion: configuration.konghq.com/v1
+kind: KongIngress
+metadata:
+  name: {{ .Values.applicationName }}-{{ .Values.environment }}
+  labels:
+    app: {{ .Values.applicationName }}-{{ .Values.environment }}
+    {{- include "telus.labels" . | nindent 4 }}
+  annotations:
+    {{- include "telus.annotations" . | nindent 4}}    
+  namespace: {{ .Values.namespace }}
+{{- with .Values.kong.ingress.upstream }}
+upstream:
+{{ toYaml . | indent 2 }}
+{{- end }}
+{{- with .Values.kong.ingress.proxy }}
+proxy:
+{{ toYaml . | indent 2 }}
+{{- end }}
+{{- with .Values.kong.ingress.route }}
+route:
+{{ toYaml . | indent 2 }}
+{{- end }}
+{{- end }}

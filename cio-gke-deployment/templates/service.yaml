@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.applicationName }}-{{ .Values.environment }}
+  labels:
+  {{- include "telus.labels" . | nindent 4 }}
+  annotations:
+  {{- include "telus.annotations" . | nindent 4}}
+    {{- if .Values.prometheus.enable }}
+    prometheus.io/scrape: "true"
+    prometheus.io/path: {{ .Values.prometheus.scrapePath | quote }}
+    prometheus.io/port: {{ .Values.prometheus.scrapePort | quote  }}
+    {{- end }}
+  namespace: {{ .Values.namespace }}  
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - port: {{ .Values.service.port }}
+    targetPort: {{ .Values.service.port }}
+  selector:
+    app: {{ .Values.applicationName }}-{{ .Values.environment }}
+    

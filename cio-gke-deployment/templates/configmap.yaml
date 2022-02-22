@@ -1,0 +1,22 @@
+{{- if .Values.configmaps }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.applicationName }}-{{ .Values.environment }}-configmap
+  labels:
+    app: {{ .Values.applicationName }}-{{ .Values.environment }}
+    {{- include "telus.labels" . | nindent 4 }}
+  annotations:
+    {{- include "telus.annotations" . | nindent 4}}    
+  namespace: {{ .Values.namespace }}
+data:
+{{- range $path, $config := .Values.configmaps.file }}
+  {{ $path }}: |
+{{ $config | indent 4 -}}
+{{- end -}}
+  {{- if .Values.configmaps.key }}
+  {{- range $key, $val := .Values.configmaps.key.properties }}
+  {{ $key }}={{ $val | quote }}
+  {{- end }}
+  {{- end }}
+{{- end -}}

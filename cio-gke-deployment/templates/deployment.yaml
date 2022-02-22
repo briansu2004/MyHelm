@@ -1,0 +1,121 @@
+{{- if (eq .Values.type "deployment")}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.applicationName }}-{{ .Values.environment }}
+  labels:
+    app: {{ .Values.applicationName }}-{{ .Values.environment }}
+    {{- include "telus.labels" . | nindent 4 }}
+  annotations:
+    {{- include "telus.annotations" . | nindent 4}}    
+    pipeline: "doe-v0.0.0"
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector: 
+    matchLabels:
+      app: {{ .Values.applicationName }}-{{ .Values.environment }}
+  revisionHistoryLimit: 10
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.applicationName }}-{{ .Values.environment }}
+        proxy: {{ .Values.proxyType | default "nginx" }}
+        {{- if .Values.disableSidecar }}
+      annotations:
+        sidecar.istio.io/inject: "false"
+        {{- end }}
+    spec:
+      serviceAccount: {{- if .Values.rbac.create }} {{  .Values.rbac.serviceAccountName }} {{- else }} {{  .Values.serviceAccount | default "default" }} {{- end}}
+      containers:
+      - name: {{ .Values.applicationName }}-{{ .Values.environment }}
+        image: {{ .Values.image.repository }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env: 
+        {{- range .Values.extraEnvs }}
+        - name: {{ .name }}
+          value: {{ .value | quote}}
+        {{- end }}
+      {{- with .Values.envFrom }}
+        envFrom: 
+{{- toYaml . | nindent 8}}
+      {{- end }}
+        volumeMounts: 
+        {{- range .Values.volumeMounts }}
+        - name: {{ .name }}
+          mountPath: {{ .path }}
+        {{- end }}
+        {{- range .Values.secretMounts }}
+        - name: {{ .name }}
+          mountPath: {{ .path }}
+        {{- end }}
+        ports:
+        - name: http-server
+          containerPort: {{ .Values.containerPort | default (8080) }}
+        livenessProbe:
+{{ toYaml .Values.livenessProbe | indent 10}}
+        readinessProbe:
+{{ toYaml .Values.readinessProbe | indent 10}}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+      {{- if .Values.command  }}
+        command: {{  .Values.command }}     
+      {{- end }}
+      {{- with .Values.commandArgs }}
+        args: 
+{{- toYaml . | nindent 8}}
+      {{- end }}
+      {{- if .Values.cloudsqlproxy.enabled }}
+      - name: cloudsql-proxy
+        image: gcr.io/cloudsql-docker/gce-proxy:{{ .Values.cloudsqlproxy.version | default (1.14) }}
+        command: ["/cloud_sql_proxy",
+        "-instances={{- .Values.cloudsqlproxy.instance_connection }}=tcp:5432"]
+        securityContext:
+          runAsUser: 2  
+          allowPrivilegeEscalation: false  
+        resources:
+          limits: 
+            cpu: 80m
+            memory: 32Mi
+          requests:
+            cpu: 80m
+            memory: 32Mi  
+      {{- end }}
+      {{- range $key, $value := .Values.sideCarContainers }}
+      - name: {{ $key }}
+{{ toYaml $value | indent 8 }}
+      {{- end }}
+      {{- if .Values.initContainers }}
+      initContainers:
+{{ tpl .Values.initContainers . | indent 6 }}
+      {{- end }}      
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+      volumes:
+      {{- if .Values.configmaps }}
+      {{- if .Values.configmaps.file }}
+      - name: configmap
+        configMap:
+          name: {{ .Values.applicationName }}-{{ .Values.environment }}-configmap
+      {{- end }}
+      {{- end }}
+      {{- if .Values.volumes }}
+      {{ tpl .Values.volumes . | nindent 6 }}
+      {{- end }}
+      {{- range .Values.secretMounts }}
+      - name: {{ .name }}
+        secret:
+          secretName: {{ .secretName }}
+      {{- end }}
+{{- end }}
+  
